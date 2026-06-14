@@ -1,5 +1,5 @@
 {
-  "name": "claude-code-usage-statusline",
+  "name": "claude-code-statusline-progress",
   "version": "1.0.0",
   "description": "Shell status line for Claude Code sessions — model, effort, context usage, and rate-limit gauges",
   "bin": {
