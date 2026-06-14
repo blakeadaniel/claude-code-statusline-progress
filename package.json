@@ -1,0 +1,27 @@
+{
+  "name": "claude-code-statusline",
+  "version": "1.0.0",
+  "description": "Shell status line for Claude Code sessions — model, effort, context usage, and rate-limit gauges",
+  "bin": {
+    "claude-code-statusline": "bin/install.js"
+  },
+  "files": [
+    "bin/",
+    "statusline-command.sh"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "statusline",
+    "anthropic"
+  ],
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/blakeadaniel/claude-code-statusline.git"
+  }
+}
