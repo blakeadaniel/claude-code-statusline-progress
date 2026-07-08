@@ -3,7 +3,7 @@
 A terminal status line for [Claude Code](https://claude.ai/code) that shows your current model, effort level, working directory, session context usage, and rolling rate-limit consumption — all in one compact bar.
 
 ```
-Opus 4.8 [high] ~/code/project [██████░░░░░░░░░░░░░░] 18% 177k / 1000k tokens  │  5h: ████░░ 66% 4h46m  │  7d: ██░░░░ 30% 1d12h
+Opus 4.8 [high] ~/code/project [███░░░░░░░] 18% 177k / 1000k tokens  │  5h: ████░░ 66% 4h46m  │  7d: ██░░░░ 30% 1d12h
 ```
 
 The bar colors shift green → yellow → red as you approach configurable warning and danger thresholds.
@@ -14,7 +14,7 @@ The bar colors shift green → yellow → red as you approach configurable warni
 |---|---|
 | `Opus 4.8 [high]` | Active model and effort level |
 | `~/code/project` | Current working directory (home directory shortened to `~`) |
-| `[██████░░░░░░░░░░░░░░] 18% 177k / 1000k tokens` | Session context window usage |
+| `[███░░░░░░░] 18% 177k / 1000k tokens` | Session context window usage |
 | `5h: ████░░ 66% 4h46m` | 5-hour rolling usage — percentage used, time until reset |
 | `7d: ██░░░░ 30% 1d12h` | 7-day rolling usage — percentage used, time until reset |
 
