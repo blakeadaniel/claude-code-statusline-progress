@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Claude Code statusLine — model, effort, context-window bar, 5h/7d usage from Anthropic headers.
-# Renders e.g.:  Opus 4.8 [high] [██████░░░░░░░░░░░░░░] 18% 177k / 1000k tokens  │  5h: ████░░ 66% 4h46m  │  7d: ██░░░░ 30% 1d12h
+# Claude Code statusLine — model, effort, cwd, context-window bar, 5h/7d usage from Anthropic headers.
+# Renders e.g.:  Opus 4.8 [high] ~/code/project [██████░░░░░░░░░░░░░░] 18% 177k / 1000k tokens  │  5h: ████░░ 66% 4h46m  │  7d: ██░░░░ 30% 1d12h
 input=$(cat)
 
 # ── Unified rate-limit headers (cached 60 s, async background refresh) ───────
@@ -95,6 +95,13 @@ model      = (data.get("model") or {}).get("display_name") or "Claude"
 effort     = os.environ.get("EFFORT", "?")
 transcript = data.get("transcript_path") or ""
 
+cwd = (data.get("workspace") or {}).get("current_dir") or data.get("cwd") or ""
+home = os.path.expanduser("~")
+if cwd == home:
+    cwd = "~"
+elif cwd.startswith(home + os.sep):
+    cwd = "~" + cwd[len(home):]
+
 # ── Current context usage ────────────────────────────────────────────────────
 used = None
 if transcript and os.path.exists(transcript):
@@ -121,6 +128,7 @@ if transcript and os.path.exists(transcript):
 # ── Colors ────────────────────────────────────────────────────────────────────
 RESET  = "\033[0m"
 GREY   = "\033[90m"
+BLUE   = "\033[38;2;97;175;239m"
 BOLD   = "\033[1m"
 GREEN  = (40, 200, 40)
 YELLOW = (230, 210, 0)
@@ -181,6 +189,8 @@ def context_bar(width):
 
 # Pre-build the fixed text fragments (these don't change with terminal width).
 header = f"{BOLD}{model}{RESET} {GREY}[{effort}]{RESET}"
+if cwd:
+    header += f" {BLUE}{cwd}{RESET}"
 
 if used is not None:
     frac       = used / CONTEXT_MAX
