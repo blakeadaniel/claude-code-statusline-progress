@@ -69,8 +69,8 @@ python3 - "$input" <<'PY'
 import json, os, re, sys, datetime
 
 CONTEXT_MAX = 1_000_000
-MIN_BAR      = 6     # narrowest the context bar ever shrinks to
-MAX_BAR      = 40    # widest it grows on roomy terminals
+MIN_BAR      = 3     # narrowest the context bar ever shrinks to
+MAX_BAR      = 20    # widest it grows on roomy terminals
 COLS         = int(os.environ.get("COLS") or 80)
 
 _ANSI = re.compile(r"\033\[[0-9;]*m")
