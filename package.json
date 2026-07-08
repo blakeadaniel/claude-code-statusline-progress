@@ -1,7 +1,7 @@
 {
   "name": "claude-code-statusline-progress",
-  "version": "1.1.0",
-  "description": "Shell status line for Claude Code sessions — model, effort, context usage, and rate-limit gauges",
+  "version": "1.2.0",
+  "description": "Shell status line for Claude Code sessions — model, effort, working directory, context usage, and rate-limit gauges",
   "bin": {
     "claude-code-statusline": "bin/install.js"
   },
