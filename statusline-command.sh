@@ -1,57 +1,7 @@
 #!/usr/bin/env bash
-# Claude Code statusLine — model, effort, cwd, context-window bar, 5h/7d usage from Anthropic headers.
+# Claude Code statusLine — model, effort, cwd, context-window bar, 5h/7d usage from native rate_limits fields.
 # Renders e.g.:  Opus 4.8 [high] ~/code/project [██████░░░░░░░░░░░░░░] 18% 177k / 1000k tokens  │  5h: ████░░ 66% 4h46m  │  7d: ██░░░░ 30% 1d12h
 input=$(cat)
-
-# ── Unified rate-limit headers (cached 60 s, async background refresh) ───────
-LIMITS_CACHE="/tmp/claude-unified-limits-cache.json"
-CREDS_FILE="${HOME}/.claude/.credentials.json"
-CACHE_TTL=60
-
-now_s=$(date +%s)
-cache_age=9999
-if [[ -f "$LIMITS_CACHE" ]]; then
-    cache_mtime=$(stat -c %Y "$LIMITS_CACHE" 2>/dev/null || echo 0)
-    cache_age=$(( now_s - cache_mtime ))
-fi
-
-if [[ $cache_age -gt $CACHE_TTL && -f "$CREDS_FILE" ]]; then
-    (
-        python3 - "$CREDS_FILE" <<'PY' > "${LIMITS_CACHE}.tmp" 2>/dev/null \
-            && mv "${LIMITS_CACHE}.tmp" "$LIMITS_CACHE"
-import json, urllib.request, sys
-with open(sys.argv[1]) as f:
-    token = json.load(f)["claudeAiOauth"]["accessToken"]
-req = urllib.request.Request(
-    "https://api.anthropic.com/v1/messages",
-    data=json.dumps({
-        "model": "claude-haiku-4-5-20251001",
-        "max_tokens": 1,
-        "messages": [{"role": "user", "content": "x"}],
-    }).encode(),
-    headers={
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-        "anthropic-version": "2023-06-01",
-        "anthropic-beta": "claude-code-20250219",
-    },
-    method="POST",
-)
-try:
-    resp = urllib.request.urlopen(req, timeout=8)
-    hdrs = dict(resp.headers)
-except urllib.error.HTTPError as e:
-    hdrs = dict(e.headers)
-result = {k: v for k, v in hdrs.items() if "ratelimit-unified" in k.lower()}
-if result:
-    print(json.dumps(result))
-PY
-    ) &
-    disown $!
-fi
-
-LIMITS_JSON=""
-[[ -f "$LIMITS_CACHE" ]] && LIMITS_JSON=$(cat "$LIMITS_CACHE")
 
 # ── Terminal width detection ─────────────────────────────────────────────────
 # The statusLine command is spawned with stdout piped, so query the controlling
@@ -63,7 +13,6 @@ COLS=$(stty size </dev/tty 2>/dev/null | awk '{print $2}')
 
 # ── Render ────────────────────────────────────────────────────────────────────
 EFFORT="${CLAUDE_EFFORT:-?}" \
-LIMITS_JSON="$LIMITS_JSON" \
 COLS="$COLS" \
 python3 - "$input" <<'PY'
 import json, math, os, re, sys, datetime
@@ -206,15 +155,17 @@ else:
     pct_txt    = ""
     tokens_txt = f"{GREY}-- / {kfmt(CONTEXT_MAX)} tokens{RESET}"
 
-# ── 5h / 7d from Anthropic unified rate-limit headers ────────────────────────
+# ── 5h / 7d from native rate_limits fields ───────────────────────────────────
 SEP = f"  {GREY}│{RESET}  "
-limits_raw = os.environ.get("LIMITS_JSON", "")
-h = {}
-if limits_raw:
-    try:
-        h = json.loads(limits_raw)
-    except Exception:
-        pass
+rl = data.get("rate_limits")
+if not isinstance(rl, dict):
+    rl = {}
+five_hour = rl.get("five_hour")
+if not isinstance(five_hour, dict):
+    five_hour = {}
+seven_day = rl.get("seven_day")
+if not isinstance(seven_day, dict):
+    seven_day = {}
 
 def usage_section(label, util, warn, danger, reset):
     if util is None:
@@ -223,15 +174,20 @@ def usage_section(label, util, warn, danger, reset):
     clr    = usage_color(frac_u, warn, danger)
     pct    = f"{clr}{frac_u * 100:.0f}%{RESET}"
     bar    = usage_bar(frac_u, warn, danger)
-    cd     = f" {GREY}{fmt_countdown(reset)}{RESET}" if reset else ""
+    cd     = f" {GREY}{fmt_countdown(reset)}{RESET}" if reset is not None else ""
     return f"{SEP}{GREY}{label}:{RESET} {bar} {pct}{cd}"
 
-sec5 = usage_section("5h", h.get("anthropic-ratelimit-unified-5h-utilization"),
+def _pct_frac(v):
+    """used_percentage is 0-100; usage_section expects a 0-1 fraction."""
+    v = _num(v)
+    return None if v is None else v / 100
+
+sec5 = usage_section("5h", _pct_frac(five_hour.get("used_percentage")),
                      USAGE_5H_WARN, USAGE_5H_DANGER,
-                     h.get("anthropic-ratelimit-unified-5h-reset"))
-sec7 = usage_section("7d", h.get("anthropic-ratelimit-unified-7d-utilization"),
+                     _num(five_hour.get("resets_at")))
+sec7 = usage_section("7d", _pct_frac(seven_day.get("used_percentage")),
                      USAGE_7D_WARN, USAGE_7D_DANGER,
-                     h.get("anthropic-ratelimit-unified-7d-reset"))
+                     _num(seven_day.get("resets_at")))
 
 # ── Responsive assembly ──────────────────────────────────────────────────────
 def assemble(bar_w, with_tokens, with5, with7):
