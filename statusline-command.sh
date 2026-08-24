@@ -104,7 +104,6 @@ if (
 
 model      = (data.get("model") or {}).get("display_name") or "Claude"
 effort     = os.environ.get("EFFORT", "?")
-transcript = data.get("transcript_path") or ""
 
 cwd = (data.get("workspace") or {}).get("current_dir") or data.get("cwd") or ""
 home = os.path.expanduser("~")
@@ -114,27 +113,12 @@ elif cwd.startswith(home + os.sep):
     cwd = "~" + cwd[len(home):]
 
 # ── Current context usage ────────────────────────────────────────────────────
-used = None
-if transcript and os.path.exists(transcript):
-    try:
-        last = None
-        with open(transcript) as fh:
-            for line in fh:
-                if '"usage"' not in line:
-                    continue
-                try:
-                    rec = json.loads(line)
-                except Exception:
-                    continue
-                u = (rec.get("message") or {}).get("usage") or rec.get("usage")
-                if isinstance(u, dict) and ("input_tokens" in u or "cache_read_input_tokens" in u):
-                    last = u
-        if last:
-            used = (last.get("input_tokens", 0)
-                    + last.get("cache_creation_input_tokens", 0)
-                    + last.get("cache_read_input_tokens", 0))
-    except Exception:
-        used = None
+current_usage = cw.get("current_usage") or {}
+used = cw.get("total_input_tokens")
+if used is None and current_usage:
+    used = (current_usage.get("input_tokens", 0)
+            + current_usage.get("cache_creation_input_tokens", 0)
+            + current_usage.get("cache_read_input_tokens", 0))
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 RESET  = "\033[0m"
