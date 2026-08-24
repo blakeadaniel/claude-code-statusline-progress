@@ -58,7 +58,7 @@ Color thresholds control when each bar transitions from green → yellow → red
 | 5-hour usage | 50% | 90% |
 | 7-day usage | 50% | 90% |
 
-To change them, re-run `npx claude-code-statusline-progress` and answer `y` at the customize prompt, or edit the constants directly in `~/.claude/statusline-command.sh`:
+To change them, re-run `npx claude-code-statusline-progress` and answer `y` at the customize prompt, set the matching environment variable before Claude Code launches (e.g. `CONTEXT_WARN=0.10`), or edit the constants directly in `~/.claude/statusline-command.sh`:
 
 ```python
 CONTEXT_WARN   = 0.20

@@ -31,13 +31,26 @@ def vis(s):
     """Visible length of a string, ignoring ANSI color escapes."""
     return len(_ANSI.sub("", s))
 
-# Thresholds: fraction at which the bar transitions green→yellow (warn) and yellow→red (danger)
-CONTEXT_WARN   = 0.20
-CONTEXT_DANGER = 0.50
-USAGE_5H_WARN   = 0.50
-USAGE_5H_DANGER = 0.90
-USAGE_7D_WARN   = 0.50
-USAGE_7D_DANGER = 0.90
+# Thresholds: fraction at which the bar transitions green→yellow (warn) and yellow→red (danger).
+# Overridable via env vars (e.g. CONTEXT_WARN=0.10) — invalid/missing values fall back to defaults.
+def _envf(name, default):
+    try:
+        return float(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+CONTEXT_WARN    = _envf("CONTEXT_WARN", 0.20)
+CONTEXT_DANGER  = _envf("CONTEXT_DANGER", 0.50)
+USAGE_5H_WARN   = _envf("USAGE_5H_WARN", 0.50)
+USAGE_5H_DANGER = _envf("USAGE_5H_DANGER", 0.90)
+USAGE_7D_WARN   = _envf("USAGE_7D_WARN", 0.50)
+USAGE_7D_DANGER = _envf("USAGE_7D_DANGER", 0.90)
+
+# Guard against an inverted/misconfigured pair (danger <= warn), which would
+# otherwise cause a ZeroDivisionError in _lerp's (frac - warn) / (danger - warn).
+CONTEXT_DANGER  = max(CONTEXT_DANGER, CONTEXT_WARN + 0.01)
+USAGE_5H_DANGER = max(USAGE_5H_DANGER, USAGE_5H_WARN + 0.01)
+USAGE_7D_DANGER = max(USAGE_7D_DANGER, USAGE_7D_WARN + 0.01)
 
 try:
     data = json.loads(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].strip() else {}
