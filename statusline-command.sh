@@ -166,6 +166,13 @@ if not isinstance(cost_data, dict):
     cost_data = {}
 total_cost = _num(cost_data.get("total_cost_usd"))
 total_duration_ms = _num(cost_data.get("total_duration_ms"))
+# Negative values are nonsensical (and would render mathematically wrong
+# strings via divmod()'s floor-toward-negative-infinity behavior) — treat
+# them the same as "no data yet", same as 0.
+if total_cost is not None and total_cost < 0:
+    total_cost = None
+if total_duration_ms is not None and total_duration_ms < 0:
+    total_duration_ms = None
 
 # ── 5h / 7d from native rate_limits fields ───────────────────────────────────
 SEP = f"  {GREY}│{RESET}  "
@@ -248,7 +255,10 @@ if sec5 and fits(MIN_BAR, with_tokens, True, with7, with_cost):
     with5 = True
 if sec7 and fits(MIN_BAR, with_tokens, with5, True, with_cost):
     with7 = True
-if sec_cost and fits(MIN_BAR, with_tokens, with5, with7, True):
+# Cost is strictly lowest priority: never let it render while a
+# higher-priority segment that HAS data was hidden by the width check.
+# (If 7d has no data at all — sec7 is None — there's nothing to defer to.)
+if sec_cost and (not sec7 or with7) and fits(MIN_BAR, with_tokens, with5, with7, True):
     with_cost = True
 
 # Grow the context bar to soak up whatever horizontal room is left.
