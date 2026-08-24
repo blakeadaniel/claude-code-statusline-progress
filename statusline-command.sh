@@ -113,12 +113,22 @@ elif cwd.startswith(home + os.sep):
     cwd = "~" + cwd[len(home):]
 
 # ── Current context usage ────────────────────────────────────────────────────
-current_usage = cw.get("current_usage") or {}
-used = cw.get("total_input_tokens")
+def _num(v):
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) else None
+
+current_usage = cw.get("current_usage")
+if not isinstance(current_usage, dict):
+    current_usage = {}
+
+used = _num(cw.get("total_input_tokens"))
 if used is None and current_usage:
-    used = (current_usage.get("input_tokens", 0)
-            + current_usage.get("cache_creation_input_tokens", 0)
-            + current_usage.get("cache_read_input_tokens", 0))
+    input_tok = _num(current_usage.get("input_tokens", 0))
+    cache_create_tok = _num(current_usage.get("cache_creation_input_tokens", 0))
+    cache_read_tok = _num(current_usage.get("cache_read_input_tokens", 0))
+    if None in (input_tok, cache_create_tok, cache_read_tok):
+        used = None
+    else:
+        used = input_tok + cache_create_tok + cache_read_tok
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 RESET  = "\033[0m"
