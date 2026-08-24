@@ -160,6 +160,20 @@ else:
     pct_txt    = ""
     tokens_txt = f"{GREY}-- / {kfmt(CONTEXT_MAX)} tokens{RESET}"
 
+# ── Session cost / duration ──────────────────────────────────────────────────
+cost_data = data.get("cost")
+if not isinstance(cost_data, dict):
+    cost_data = {}
+total_cost = _num(cost_data.get("total_cost_usd"))
+total_duration_ms = _num(cost_data.get("total_duration_ms"))
+# Negative values are nonsensical (and would render mathematically wrong
+# strings via divmod()'s floor-toward-negative-infinity behavior) — treat
+# them the same as "no data yet", same as 0.
+if total_cost is not None and total_cost < 0:
+    total_cost = None
+if total_duration_ms is not None and total_duration_ms < 0:
+    total_duration_ms = None
+
 # ── 5h / 7d from native rate_limits fields ───────────────────────────────────
 SEP = f"  {GREY}│{RESET}  "
 rl = data.get("rate_limits")
@@ -194,8 +208,23 @@ sec7 = usage_section("7d", _pct_frac(seven_day.get("used_percentage")),
                      USAGE_7D_WARN, USAGE_7D_DANGER,
                      _num(seven_day.get("resets_at")))
 
+def cost_section():
+    if not total_cost and not total_duration_ms:
+        return None
+    parts = []
+    if total_cost:
+        parts.append(f"${total_cost:.2f}")
+    if total_duration_ms:
+        secs = int(total_duration_ms / 1000)
+        h, rem = divmod(secs, 3600)
+        m, s = divmod(rem, 60)
+        parts.append(f"{h}h{m:02d}m" if h else f"{m}m{s:02d}s")
+    return f"{SEP}{GREY}{' · '.join(parts)}{RESET}"
+
+sec_cost = cost_section()
+
 # ── Responsive assembly ──────────────────────────────────────────────────────
-def assemble(bar_w, with_tokens, with5, with7):
+def assemble(bar_w, with_tokens, with5, with7, with_cost):
     s = f"{header} [{context_bar(bar_w)}]"
     if pct_txt:
         s += f" {pct_txt}"
@@ -205,29 +234,36 @@ def assemble(bar_w, with_tokens, with5, with7):
         s += sec5
     if with7 and sec7:
         s += sec7
+    if with_cost and sec_cost:
+        s += sec_cost
     return s
 
 # Leave a 1-column margin; never demand less than header + a minimum bar fits.
 budget = max(vis(header) + MIN_BAR + 4, COLS - 1)
 
-def fits(bw, t, a, b):
-    return vis(assemble(bw, t, a, b)) <= budget
+def fits(bw, t, a, b, c):
+    return vis(assemble(bw, t, a, b, c)) <= budget
 
 # Greedily enable optional segments at the minimum bar width, in priority order:
-# context token detail → 5h gauge → 7d gauge. When usage is unknown the token
-# label is the only context detail, so it is always shown.
+# context token detail → 5h gauge → 7d gauge → cost/duration. When usage is
+# unknown the token label is the only context detail, so it is always shown.
 with_tokens = used is None
-with5 = with7 = False
-if used is not None and fits(MIN_BAR, True, with5, with7):
+with5 = with7 = with_cost = False
+if used is not None and fits(MIN_BAR, True, with5, with7, with_cost):
     with_tokens = True
-if sec5 and fits(MIN_BAR, with_tokens, True, with7):
+if sec5 and fits(MIN_BAR, with_tokens, True, with7, with_cost):
     with5 = True
-if sec7 and fits(MIN_BAR, with_tokens, with5, True):
+if sec7 and fits(MIN_BAR, with_tokens, with5, True, with_cost):
     with7 = True
+# Cost is strictly lowest priority: never let it render while a
+# higher-priority segment that HAS data was hidden by the width check.
+# (If 7d has no data at all — sec7 is None — there's nothing to defer to.)
+if sec_cost and (not sec7 or with7) and fits(MIN_BAR, with_tokens, with5, with7, True):
+    with_cost = True
 
 # Grow the context bar to soak up whatever horizontal room is left.
-used_cols = vis(assemble(MIN_BAR, with_tokens, with5, with7))
+used_cols = vis(assemble(MIN_BAR, with_tokens, with5, with7, with_cost))
 bar_w     = max(MIN_BAR, min(MAX_BAR, MIN_BAR + (budget - used_cols)))
 
-sys.stdout.write(assemble(bar_w, with_tokens, with5, with7))
+sys.stdout.write(assemble(bar_w, with_tokens, with5, with7, with_cost))
 PY
