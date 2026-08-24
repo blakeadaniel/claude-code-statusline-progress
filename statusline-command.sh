@@ -4,12 +4,17 @@
 input=$(cat)
 
 # ── Terminal width detection ─────────────────────────────────────────────────
-# The statusLine command is spawned with stdout piped, so query the controlling
-# terminal directly. Fall back through $COLUMNS, tput, then a sane default.
-COLS=$(stty size </dev/tty 2>/dev/null | awk '{print $2}')
-[[ "$COLS" =~ ^[0-9]+$ ]] || COLS="${COLUMNS:-}"
-[[ "$COLS" =~ ^[0-9]+$ ]] || COLS=$(tput cols 2>/dev/null)
-[[ "$COLS" =~ ^[0-9]+$ ]] || COLS=80
+# Claude Code sets $COLUMNS before invoking the statusLine command (v2.1.153+
+# per the official docs), so prefer it first. The script's stdout is captured
+# rather than connected to a real terminal, so tty-based detection (stty/tput)
+# is unreliable here — those are kept only as fallbacks for manual testing
+# outside Claude Code. Guard against $COLUMNS being present but invalid
+# (non-numeric, or 0 — a zero-width terminal makes no sense) by falling
+# through to the next source rather than accepting it.
+COLS="${COLUMNS:-}"
+[[ "$COLS" =~ ^[0-9]+$ ]] && [[ "$COLS" -gt 0 ]] || COLS=$(stty size </dev/tty 2>/dev/null | awk '{print $2}')
+[[ "$COLS" =~ ^[0-9]+$ ]] && [[ "$COLS" -gt 0 ]] || COLS=$(tput cols 2>/dev/null)
+[[ "$COLS" =~ ^[0-9]+$ ]] && [[ "$COLS" -gt 0 ]] || COLS=80
 
 # ── Render ────────────────────────────────────────────────────────────────────
 EFFORT="${CLAUDE_EFFORT:-?}" \
