@@ -20,7 +20,7 @@ COLS="${COLUMNS:-}"
 EFFORT="${CLAUDE_EFFORT:-?}" \
 COLS="$COLS" \
 python3 - "$input" <<'PY'
-import json, math, os, re, sys, datetime
+import json, math, os, re, subprocess, sys, datetime
 
 MIN_BAR      = 3     # narrowest the context bar ever shrinks to
 MAX_BAR      = 20    # widest it grows on roomy terminals
@@ -65,6 +65,35 @@ if cwd == home:
     cwd = "~"
 elif cwd.startswith(home + os.sep):
     cwd = "~" + cwd[len(home):]
+
+# ── Git branch / dirty-state indicator ───────────────────────────────────────
+# workspace.repo is only present (per docs) when the cwd is inside a git repo,
+# so gate the whole block on it — outside a git repo this makes zero
+# subprocess calls. Color constants (GREY/RESET) aren't defined until later
+# in the file, so raw ANSI literals are used here rather than reordering
+# unrelated code.
+_GIT_GREY  = "\033[90m"
+_GIT_RESET = "\033[0m"
+repo_info = (data.get("workspace") or {}).get("repo")
+git_dir = (data.get("workspace") or {}).get("current_dir") or data.get("cwd") or ""
+branch_txt = ""
+if repo_info and git_dir and os.path.isdir(git_dir):
+    try:
+        br = subprocess.run(
+            ["git", "-C", git_dir, "branch", "--show-current"],
+            capture_output=True, text=True, timeout=0.3,
+        )
+        branch = br.stdout.strip()
+        if branch:
+            dirty = subprocess.run(
+                ["git", "-C", git_dir, "status", "--porcelain"],
+                capture_output=True, text=True, timeout=0.3,
+            )
+            is_dirty = bool(dirty.stdout.strip())
+            dot = "*" if is_dirty else ""
+            branch_txt = f" {_GIT_GREY}({branch}{dot}){_GIT_RESET}"
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        branch_txt = ""
 
 # ── Current context usage ────────────────────────────────────────────────────
 def _num(v):
@@ -149,7 +178,7 @@ def context_bar(width):
 # Pre-build the fixed text fragments (these don't change with terminal width).
 header = f"{BOLD}{model}{RESET} {GREY}[{effort}]{RESET}"
 if cwd:
-    header += f" {BLUE}{cwd}{RESET}"
+    header += f" {BLUE}{cwd}{RESET}{branch_txt}"
 
 if used is not None:
     frac       = used / CONTEXT_MAX
