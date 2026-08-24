@@ -68,7 +68,6 @@ COLS="$COLS" \
 python3 - "$input" <<'PY'
 import json, os, re, sys, datetime
 
-CONTEXT_MAX = 1_000_000
 MIN_BAR      = 3     # narrowest the context bar ever shrinks to
 MAX_BAR      = 20    # widest it grows on roomy terminals
 COLS         = int(os.environ.get("COLS") or 80)
@@ -90,6 +89,11 @@ try:
     data = json.loads(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].strip() else {}
 except Exception:
     data = {}
+
+cw = data.get("context_window") or {}
+CONTEXT_MAX = cw.get("context_window_size") or 1_000_000
+if not isinstance(CONTEXT_MAX, (int, float)) or CONTEXT_MAX <= 0:
+    CONTEXT_MAX = 1_000_000
 
 model      = (data.get("model") or {}).get("display_name") or "Claude"
 effort     = os.environ.get("EFFORT", "?")
