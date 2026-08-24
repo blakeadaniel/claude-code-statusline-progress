@@ -66,7 +66,7 @@ EFFORT="${CLAUDE_EFFORT:-?}" \
 LIMITS_JSON="$LIMITS_JSON" \
 COLS="$COLS" \
 python3 - "$input" <<'PY'
-import json, os, re, sys, datetime
+import json, math, os, re, sys, datetime
 
 MIN_BAR      = 3     # narrowest the context bar ever shrinks to
 MAX_BAR      = 20    # widest it grows on roomy terminals
@@ -90,9 +90,16 @@ try:
 except Exception:
     data = {}
 
-cw = data.get("context_window") or {}
+cw = data.get("context_window")
+if not isinstance(cw, dict):
+    cw = {}
 CONTEXT_MAX = cw.get("context_window_size") or 1_000_000
-if not isinstance(CONTEXT_MAX, (int, float)) or CONTEXT_MAX <= 0:
+if (
+    isinstance(CONTEXT_MAX, bool)
+    or not isinstance(CONTEXT_MAX, (int, float))
+    or not math.isfinite(CONTEXT_MAX)
+    or CONTEXT_MAX <= 0
+):
     CONTEXT_MAX = 1_000_000
 
 model      = (data.get("model") or {}).get("display_name") or "Claude"
