@@ -7,6 +7,9 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node.js >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](package.json)
 
+<!-- Absolute raw URL so the demo also renders on npmjs.com, which does not resolve relative paths. -->
+<img src="https://raw.githubusercontent.com/blakeadaniel/claude-code-statusline-progress/main/assets/statusline-demo.gif" alt="Animated demo: the status line as a session fills up, with the context bar shifting green to yellow to red, and segments dropping off as the terminal narrows" width="100%">
+
 ```
 Opus 5 [high] ~/code/project (main*) [████░░░░░░░░░░░░░░░░] 18% 177k / 1000k tokens  │  5h: [████░░] 66% 4h46m  │  7d: [██░░░░] 30% 1d12h  │  $3.42 · 1h15m
 ```
