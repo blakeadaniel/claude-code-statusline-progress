@@ -1,39 +1,69 @@
 # claude-code-statusline-progress
 
-A terminal status line for [Claude Code](https://claude.ai/code) that shows your current model, effort level, working directory, session context usage, and rolling rate-limit consumption — all in one compact bar.
+A terminal status line for [Claude Code](https://claude.ai/code) that shows your current model, effort level, working directory, git branch, session context usage, rolling rate-limit consumption, and session cost — all in one compact, responsive bar.
+
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.3.0-green.svg)](package.json)
+[![npm](https://img.shields.io/badge/npm-claude--code--statusline--progress-red.svg)](https://www.npmjs.com/package/claude-code-statusline-progress)
 
 ```
-Opus 4.8 [high] ~/code/project [███░░░░░░░] 18% 177k / 1000k tokens  │  5h: ████░░ 66% 4h46m  │  7d: ██░░░░ 30% 1d12h
+Opus 5 [high] ~/code/project (main*) [████░░░░░░░░░░░░░░░░] 18% 177k / 1000k tokens  │  5h: [████░░] 66% 4h46m  │  7d: [██░░░░] 30% 1d12h  │  $3.42 · 1h15m
 ```
 
-The bar colors shift green → yellow → red as you approach configurable warning and danger thresholds.
+The bars shift green → yellow → red as you approach configurable warning and danger thresholds. Everything is rendered by a single `bash` + `python3` script with no dependencies beyond the standard library — no network calls, no background daemons, no state files.
 
-## What it shows
+## 📋 Table of Contents
 
-| Segment | Description |
-|---|---|
-| `Opus 4.8 [high]` | Active model and effort level |
-| `~/code/project` | Current working directory (home directory shortened to `~`) |
-| `[███░░░░░░░] 18% 177k / 1000k tokens` | Session context window usage |
-| `5h: ████░░ 66% 4h46m` | 5-hour rolling usage — percentage used, time until reset |
-| `7d: ██░░░░ 30% 1d12h` | 7-day rolling usage — percentage used, time until reset |
+- [What it shows](#what-it-shows)
+- [Responsive sizing](#responsive-sizing)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [How it works](#how-it-works)
+- [Development](#development)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
 
-The 5h and 7d gauges are fetched from Anthropic's rate-limit response headers and cached for 60 seconds in the background so they don't slow down the status line render.
+## ✨ What it shows
 
-## Responsive sizing
+| Segment | Example | Description |
+|---|---|---|
+| Model | `Opus 5` | Active model display name |
+| Effort | `[high]` | Reasoning effort, from `$CLAUDE_EFFORT` |
+| Directory | `~/code/project` | Current working directory, home shortened to `~` |
+| Git | `(main*)` | Branch name; `*` marks a dirty working tree |
+| Context bar | `[███░░░░░░░] 18% 177k / 1000k tokens` | Session context window usage |
+| 5-hour gauge | `5h: [████░░] 66% 4h46m` | 5-hour rolling usage and time until reset |
+| 7-day gauge | `7d: [██░░░░] 30% 1d12h` | 7-day rolling usage and time until reset |
+| Cost | `$3.42 · 1h15m` | Session cost so far and wall-clock duration |
 
-The status line adapts to your terminal width. The context bar grows and shrinks to fill the available space, and lower-priority segments drop off as the window narrows:
+Every segment is optional in the sense that it disappears when Claude Code doesn't supply the underlying data — outside a git repo there's no branch, and before the first API response there are no rate-limit gauges.
+
+## 📐 Responsive sizing
+
+The status line adapts to your terminal width. The context bar grows and shrinks to fill the available space (between 3 and 20 cells), and lower-priority segments drop off as the window narrows:
 
 | Terminal width | What's shown |
 |---|---|
-| Wide | Full bar + `5h` + `7d` gauges |
-| Narrower | `7d` gauge drops |
-| Narrower still | both gauges drop, token detail stays |
-| Narrow | token detail drops — model, bar, and `%` remain |
+| Widest | Full bar + `5h` + `7d` gauges + cost |
+| Narrower | cost drops |
+| Narrower still | `7d` gauge drops |
+| Narrower again | both gauges drop, token detail stays |
+| Narrowest | token detail drops — model, cwd, bar, and `%` remain |
 
-Width is read from the controlling terminal at render time (`stty size`, falling back to `$COLUMNS`, `tput cols`, then `80`). Note that Claude Code re-runs the status line on activity and on a periodic idle refresh — not on terminal resize events — so after resizing, the new width is picked up on the next refresh rather than instantly.
+Priority order is: context token detail → `5h` gauge → `7d` gauge → cost. Cost never renders while a higher-priority segment that *has* data was hidden for width.
 
-## Install
+Width comes from `$COLUMNS`, which Claude Code sets before invoking the command (v2.1.153+), falling back to `stty size`, then `tput cols`, then `80`. Claude Code re-runs the status line on activity and on a periodic idle refresh — not on terminal resize events — so after resizing, the new width is picked up on the next refresh rather than instantly.
+
+## 🚀 Installation
+
+### Prerequisites
+
+- Claude Code
+- `bash`
+- Python 3 (standard library only)
+- Node.js ≥ 18 — for the installer only; the status line itself never runs Node
+
+### Using npx (recommended)
 
 ```sh
 npx claude-code-statusline-progress
@@ -41,48 +71,192 @@ npx claude-code-statusline-progress
 
 The installer will:
 
-1. Show the default color thresholds
-2. Ask if you want to customize them
-3. Copy the script to `~/.claude/statusline-command.sh`
-4. Add the `statusLine` entry to `~/.claude/settings.json`
+1. Print the default color thresholds
+2. Ask whether you want to customize them (`Customize thresholds? [y/N]`)
+3. Write the script to `~/.claude/statusline-command.sh` (mode `0755`), baking in your thresholds
+4. Merge a `statusLine` entry into `~/.claude/settings.json`, preserving your other settings
 
-Restart Claude Code after installing.
+Restart Claude Code afterwards.
 
-## Thresholds
+If `~/.claude/settings.json` exists but isn't valid JSON, the installer stops and tells you to fix it rather than overwriting it.
 
-Color thresholds control when each bar transitions from green → yellow → red. The defaults are:
+### From source
 
-| Meter | Warning | Danger |
-|---|---|---|
-| Session context window | 20% | 50% |
-| 5-hour usage | 50% | 90% |
-| 7-day usage | 50% | 90% |
-
-To change them, re-run `npx claude-code-statusline-progress` and answer `y` at the customize prompt, set the matching environment variable before Claude Code launches (e.g. `CONTEXT_WARN=0.10`), or edit the constants directly in `~/.claude/statusline-command.sh`:
-
-```python
-CONTEXT_WARN   = 0.20
-CONTEXT_DANGER = 0.50
-USAGE_5H_WARN   = 0.50
-USAGE_5H_DANGER = 0.90
-USAGE_7D_WARN   = 0.50
-USAGE_7D_DANGER = 0.90
+```sh
+git clone https://github.com/blakeadaniel/claude-code-statusline-progress.git
+cd claude-code-statusline-progress
+node bin/install.js
 ```
 
-## Manual setup
+### Manual setup
 
-If you prefer not to use `npx`, copy `statusline-command.sh` anywhere and add this to `~/.claude/settings.json`:
+Copy `statusline-command.sh` anywhere and point Claude Code at it in `~/.claude/settings.json`:
 
 ```json
-"statusLine": {
-  "type": "command",
-  "command": "bash /path/to/statusline-command.sh"
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bash /path/to/statusline-command.sh"
+  }
 }
 ```
 
-## Requirements
+A ready-to-paste version of that block is in [settings-snippet.json](settings-snippet.json).
 
-- Claude Code
-- bash
-- Python 3 (standard library only)
-- Node.js ≥ 18 (installer only)
+### Let Claude install it
+
+[setup-prompt.md](setup-prompt.md) contains a prompt you can paste into Claude Code to have it do the copy, the threshold edits, and the settings merge for you.
+
+## ⚙️ Configuration
+
+### Color thresholds
+
+Each bar transitions green → yellow over the range `[0, warn]`, yellow → red over `[warn, danger]`, and stays solid red above `danger`.
+
+| Meter | Warn constant | Default | Danger constant | Default |
+|---|---|---|---|---|
+| Session context window | `CONTEXT_WARN` | `0.20` | `CONTEXT_DANGER` | `0.50` |
+| 5-hour usage | `USAGE_5H_WARN` | `0.50` | `USAGE_5H_DANGER` | `0.90` |
+| 7-day usage | `USAGE_7D_WARN` | `0.50` | `USAGE_7D_DANGER` | `0.90` |
+
+There are three ways to change them:
+
+**1. Re-run the installer** and answer `y` at the customize prompt. It asks for percentages (`20`, not `0.20`) and rejects a danger value that isn't above its warning.
+
+**2. Set environment variables** before Claude Code launches. Values are fractions:
+
+```sh
+export CONTEXT_WARN=0.10
+export CONTEXT_DANGER=0.35
+claude
+```
+
+Invalid or unparseable values silently fall back to the defaults. If `danger <= warn`, danger is nudged to `warn + 0.01` so the gradient math stays well-defined.
+
+**3. Edit the constants** directly near the top of the Python block in `~/.claude/statusline-command.sh`:
+
+```python
+CONTEXT_WARN    = _envf("CONTEXT_WARN", 0.20)
+CONTEXT_DANGER  = _envf("CONTEXT_DANGER", 0.50)
+USAGE_5H_WARN   = _envf("USAGE_5H_WARN", 0.50)
+USAGE_5H_DANGER = _envf("USAGE_5H_DANGER", 0.90)
+USAGE_7D_WARN   = _envf("USAGE_7D_WARN", 0.50)
+USAGE_7D_DANGER = _envf("USAGE_7D_DANGER", 0.90)
+```
+
+### Environment variables
+
+| Variable | Description | Default |
+|---|---|---|
+| `CLAUDE_EFFORT` | Effort label shown in brackets | `?` |
+| `COLUMNS` | Terminal width; set by Claude Code | `stty` → `tput` → `80` |
+| `CONTEXT_WARN` / `CONTEXT_DANGER` | Context bar thresholds (0–1) | `0.20` / `0.50` |
+| `USAGE_5H_WARN` / `USAGE_5H_DANGER` | 5-hour gauge thresholds (0–1) | `0.50` / `0.90` |
+| `USAGE_7D_WARN` / `USAGE_7D_DANGER` | 7-day gauge thresholds (0–1) | `0.50` / `0.90` |
+
+### Bar sizing
+
+Two constants at the top of the Python block control the context bar's range:
+
+```python
+MIN_BAR = 3     # narrowest the context bar ever shrinks to
+MAX_BAR = 20    # widest it grows on roomy terminals
+```
+
+## 🔍 How it works
+
+Claude Code invokes the command on each refresh and pipes a JSON status object to it on stdin. The script reads that object and renders one line to stdout — that's the whole contract. The fields it consumes:
+
+| JSON path | Used for |
+|---|---|
+| `model.display_name` | Model name |
+| `workspace.current_dir` (or `cwd`) | Directory segment, and the `git -C` target |
+| `workspace.repo` | Gate for the git block — absent means no `git` subprocess runs at all |
+| `context_window.context_window_size` | Bar denominator (falls back to 1,000,000) |
+| `context_window.total_input_tokens` | Bar numerator |
+| `context_window.current_usage.*` | Numerator fallback: input + cache-creation + cache-read tokens |
+| `rate_limits.five_hour.used_percentage` / `.resets_at` | 5-hour gauge and countdown |
+| `rate_limits.seven_day.used_percentage` / `.resets_at` | 7-day gauge and countdown |
+| `cost.total_cost_usd` / `.total_duration_ms` | Cost segment |
+
+Two design notes worth knowing:
+
+- **No network calls.** The 5h/7d numbers come from the `rate_limits` fields in the status JSON. Earlier versions probed the API for rate-limit response headers and cached the result; that's gone as of v1.3.0.
+- **Git is nearly free.** The branch lookup only runs when `workspace.repo` is present, and both `git` calls carry a 300 ms timeout. Outside a repo the script makes zero subprocesses.
+
+Every field is defensively parsed: wrong types, non-finite numbers, negative costs, and malformed JSON all degrade to a sensible placeholder instead of a traceback in your status bar.
+
+## 🛠️ Development
+
+### Project structure
+
+```
+claude-code-statusline-progress/
+├── statusline-command.sh   # The whole status line: bash wrapper + inline Python
+├── bin/
+│   └── install.js          # npx installer — prompts, patches, wires up settings.json
+├── settings-snippet.json   # Copy-paste settings.json fragment
+├── setup-prompt.md         # Prompt for having Claude Code install it
+├── package.json
+└── LICENSE
+```
+
+### Running it by hand
+
+The script is a pure stdin → stdout filter, so you can exercise any state without launching Claude Code:
+
+```sh
+echo '{
+  "model": {"display_name": "Opus 5"},
+  "workspace": {"current_dir": "'"$PWD"'", "repo": {"root": "'"$PWD"'"}},
+  "context_window": {"context_window_size": 1000000, "total_input_tokens": 177000},
+  "rate_limits": {
+    "five_hour": {"used_percentage": 66, "resets_at": '"$(( $(date +%s) + 17160 ))"'},
+    "seven_day": {"used_percentage": 30, "resets_at": '"$(( $(date +%s) + 129600 ))"'}
+  },
+  "cost": {"total_cost_usd": 3.42, "total_duration_ms": 4500000}
+}' | COLUMNS=200 CLAUDE_EFFORT=high bash statusline-command.sh
+```
+
+Change `COLUMNS` to watch segments drop out:
+
+```sh
+for w in 200 160 120 90 60; do
+  printf '%3d: ' "$w"
+  echo '{"model":{"display_name":"Opus 5"},"workspace":{"current_dir":"'"$PWD"'"},"context_window":{"total_input_tokens":177000},"rate_limits":{"five_hour":{"used_percentage":66},"seven_day":{"used_percentage":30}}}' \
+    | COLUMNS=$w CLAUDE_EFFORT=high bash statusline-command.sh
+  echo
+done
+```
+
+Pipe through `sed 's/\x1b\[[0-9;]*m//g'` to see the plain text and check the visible width.
+
+### Testing
+
+There is no automated test suite. Changes are verified by hand with the stdin snippets above — in particular against empty input (`echo '{}'`), malformed input, missing `rate_limits`, and a range of `COLUMNS` values.
+
+### Releasing
+
+Bump `version` in [package.json](package.json), commit, tag, and `npm publish`. The published tarball contains only `bin/` and `statusline-command.sh` (see the `files` field).
+
+## 🆘 Troubleshooting
+
+**The status line doesn't appear.** Confirm the `statusLine` key is in `~/.claude/settings.json` and restart Claude Code. Then run the script by hand with the snippet above to check it renders.
+
+**Effort shows `?`.** The label comes from `$CLAUDE_EFFORT` in the environment Claude Code runs the command in. If it isn't set, `?` is the honest answer.
+
+**No `5h` / `7d` gauges.** Those need `rate_limits` in the status JSON, which isn't populated until Claude Code has seen an API response — and they're also the first things dropped when the terminal is narrow. Widen the window and send a message.
+
+**No git branch.** The block only runs when `workspace.repo` is present in the JSON, i.e. when the cwd is inside a repo. A detached HEAD produces an empty branch name and is therefore skipped.
+
+**Colors look wrong.** The script emits 24-bit truecolor escapes (`\033[38;2;r;g;bm`). A terminal without truecolor support will approximate or mangle them.
+
+## 📄 License
+
+MIT — see [LICENSE](LICENSE).
+
+## 👤 Author
+
+**Blake Daniel** — [@blakeadaniel](https://github.com/blakeadaniel)
+
+Issues and pull requests: [github.com/blakeadaniel/claude-code-statusline-progress](https://github.com/blakeadaniel/claude-code-statusline-progress/issues)
