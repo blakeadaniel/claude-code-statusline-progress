@@ -1,10 +1,11 @@
 # claude-code-statusline-progress
 
-A terminal status line for [Claude Code](https://claude.ai/code) that shows your current model, effort level, working directory, git branch, session context usage, rolling rate-limit consumption, and session cost — all in one compact, responsive bar.
+**claude-code-statusline-progress** is a terminal status line for the [Claude Code](https://claude.ai/code) CLI that gives you real-time monitoring of token usage, context-window consumption, and Anthropic rate limits without leaving your shell. It renders a single compact bar showing the active model, reasoning effort, working directory, git branch, session context usage, 5-hour and 7-day rolling rate-limit gauges, and session cost — installed with one `npx` command and driven by a dependency-free `bash` + `python3` script.
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.3.0-green.svg)](package.json)
-[![npm](https://img.shields.io/badge/npm-claude--code--statusline--progress-red.svg)](https://www.npmjs.com/package/claude-code-statusline-progress)
+[![npm version](https://img.shields.io/npm/v/claude-code-statusline-progress.svg)](https://www.npmjs.com/package/claude-code-statusline-progress)
+[![npm downloads](https://img.shields.io/npm/dm/claude-code-statusline-progress.svg)](https://www.npmjs.com/package/claude-code-statusline-progress)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node.js >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](package.json)
 
 ```
 Opus 5 [high] ~/code/project (main*) [████░░░░░░░░░░░░░░░░] 18% 177k / 1000k tokens  │  5h: [████░░] 66% 4h46m  │  7d: [██░░░░] 30% 1d12h  │  $3.42 · 1h15m
@@ -12,18 +13,21 @@ Opus 5 [high] ~/code/project (main*) [████░░░░░░░░░░
 
 The bars shift green → yellow → red as you approach configurable warning and danger thresholds. Everything is rendered by a single `bash` + `python3` script with no dependencies beyond the standard library — no network calls, no background daemons, no state files.
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [What it shows](#what-it-shows)
+- [Why use a Claude Code status line?](#why-use-a-claude-code-status-line)
 - [Responsive sizing](#responsive-sizing)
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [How it works](#how-it-works)
 - [Development](#development)
 - [Troubleshooting](#troubleshooting)
+- [FAQ](#faq)
+- [Related tools](#related-tools)
 - [License](#license)
 
-## ✨ What it shows
+## What it shows
 
 | Segment | Example | Description |
 |---|---|---|
@@ -38,7 +42,17 @@ The bars shift green → yellow → red as you approach configurable warning and
 
 Every segment is optional in the sense that it disappears when Claude Code doesn't supply the underlying data — outside a git repo there's no branch, and before the first API response there are no rate-limit gauges.
 
-## 📐 Responsive sizing
+## Why use a Claude Code status line?
+
+Claude Code sessions burn through a context window and a rolling usage allowance at the same time, and neither is visible while you work. This status line answers the three questions that interrupt a session:
+
+- **How much context is left?** A live token bar (`177k / 1000k tokens`) instead of waiting for a compaction warning.
+- **How close am I to a rate limit?** 5-hour and 7-day usage gauges with the exact time until each window resets.
+- **What has this session cost?** Running USD cost and wall-clock duration.
+
+It is a single shell script — no daemon, no network calls, no state files, no telemetry — so nothing runs between refreshes and nothing leaves your machine.
+
+## Responsive sizing
 
 The status line adapts to your terminal width. The context bar grows and shrinks to fill the available space (between 3 and 20 cells), and lower-priority segments drop off as the window narrows:
 
@@ -54,7 +68,7 @@ Priority order is: context token detail → `5h` gauge → `7d` gauge → cost. 
 
 Width comes from `$COLUMNS`, which Claude Code sets before invoking the command (v2.1.153+), falling back to `stty size`, then `tput cols`, then `80`. Claude Code re-runs the status line on activity and on a periodic idle refresh — not on terminal resize events — so after resizing, the new width is picked up on the next refresh rather than instantly.
 
-## 🚀 Installation
+## Installation
 
 ### Prerequisites
 
@@ -107,7 +121,7 @@ A ready-to-paste version of that block is in [settings-snippet.json](settings-sn
 
 [setup-prompt.md](setup-prompt.md) contains a prompt you can paste into Claude Code to have it do the copy, the threshold edits, and the settings merge for you.
 
-## ⚙️ Configuration
+## Configuration
 
 ### Color thresholds
 
@@ -163,7 +177,7 @@ MIN_BAR = 3     # narrowest the context bar ever shrinks to
 MAX_BAR = 20    # widest it grows on roomy terminals
 ```
 
-## 🔍 How it works
+## How it works
 
 Claude Code invokes the command on each refresh and pipes a JSON status object to it on stdin. The script reads that object and renders one line to stdout — that's the whole contract. The fields it consumes:
 
@@ -186,7 +200,7 @@ Two design notes worth knowing:
 
 Every field is defensively parsed: wrong types, non-finite numbers, negative costs, and malformed JSON all degrade to a sensible placeholder instead of a traceback in your status bar.
 
-## 🛠️ Development
+## Development
 
 ### Project structure
 
@@ -239,7 +253,7 @@ There is no automated test suite. Changes are verified by hand with the stdin sn
 
 Bump `version` in [package.json](package.json), commit, tag, and `npm publish`. The published tarball contains only `bin/` and `statusline-command.sh` (see the `files` field).
 
-## 🆘 Troubleshooting
+## Troubleshooting
 
 **The status line doesn't appear.** Confirm the `statusLine` key is in `~/.claude/settings.json` and restart Claude Code. Then run the script by hand with the snippet above to check it renders.
 
@@ -251,11 +265,27 @@ Bump `version` in [package.json](package.json), commit, tag, and `npm publish`. 
 
 **Colors look wrong.** The script emits 24-bit truecolor escapes (`\033[38;2;r;g;bm`). A terminal without truecolor support will approximate or mangle them.
 
-## 📄 License
+## FAQ
+
+**Does it work with any terminal?** Any terminal that supports 24-bit truecolor ANSI escapes renders the gradient correctly. Others will approximate the colors.
+
+**Does it send data anywhere?** No. Every number comes from the JSON that Claude Code pipes to the command on stdin. The script makes no network calls.
+
+**Does it need Node.js at runtime?** No. Node ≥ 18 is used only by the `npx` installer; the status line itself is `bash` + `python3`.
+
+**Does it slow down Claude Code?** The script is a stdin → stdout filter with no subprocesses outside a git repo, and two `git` calls with a 300 ms timeout inside one.
+
+**Where is the architecture documented?** In [docs/architecture/](docs/architecture/), including Mermaid [diagrams](docs/architecture/diagrams.md) of the render pipeline.
+
+## Related tools
+
+- [claude-discord-notify](https://github.com/blakeadaniel/claude-discord-notify) — send Claude Code notifications to a Discord channel via webhook.
+
+## License
 
 MIT — see [LICENSE](LICENSE).
 
-## 👤 Author
+## Author
 
 **Blake Daniel** — [@blakeadaniel](https://github.com/blakeadaniel)
 

@@ -1,7 +1,7 @@
 {
   "name": "claude-code-statusline-progress",
-  "version": "1.3.0",
-  "description": "Shell status line for Claude Code sessions — model, effort, working directory, context usage, and rate-limit gauges",
+  "version": "1.3.1",
+  "description": "Terminal status line for the Claude Code CLI — tracks token usage, context window, and 5h/7d rate limits in your shell prompt",
   "bin": {
     "claude-code-statusline": "bin/install.js"
   },
@@ -15,13 +15,35 @@
   "keywords": [
     "claude",
     "claude-code",
+    "claude-code-statusline",
+    "anthropic",
     "statusline",
-    "anthropic"
+    "status-line",
+    "statusbar",
+    "cli",
+    "terminal",
+    "console",
+    "prompt",
+    "shell",
+    "bash",
+    "token-usage",
+    "token-tracker",
+    "usage-tracker",
+    "context-window",
+    "rate-limit",
+    "rate-limits",
+    "monitor",
+    "developer-tools"
   ],
+  "author": "Blake Daniel (https://github.com/blakeadaniel)",
   "type": "module",
   "license": "MIT",
+  "homepage": "https://github.com/blakeadaniel/claude-code-statusline-progress#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/blakeadaniel/claude-code-statusline-progress.git"
+    "url": "git+https://github.com/blakeadaniel/claude-code-statusline-progress.git"
+  },
+  "bugs": {
+    "url": "https://github.com/blakeadaniel/claude-code-statusline-progress/issues"
   }
 }
